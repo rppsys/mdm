@@ -22,6 +22,8 @@ nltk.download('punkt')
 # Modelo
 from gensim.models import LsiModel
 
+
+
 # Gerando o Corpus
 def read_csv(file_name):
     for chunk in pd.read_csv(file_name, chunksize=1,delimiter=';',header=None):
@@ -34,6 +36,31 @@ def saveDoc(filename,content):
     print('{} gerado!'.format(filename))
     f.close()
 
+def createNovoCSV(filenameRaw,filenameGood):
+    df = pd.read_csv(filenameRaw, delimiter=';', header=None)
+    df_clone = df.copy()
+    df_novo = df_clone[[5, 6]]
+    df = df_novo.rename(columns={5: 'prop', 6: 'classe'})
+
+    # Se livra de outros
+    df = df[df['classe'] != 'Outro']
+
+    # Remove colunas com classes com baixa frequencia
+    col = 'classe'
+    n = 2000
+    df = df[df.groupby(col)[col].transform('count').ge(n)]
+
+    df.to_csv(filenameGood, header=False, index=False, sep=';')
+    print('"{}" gerado!'.format(filenameGood))
+
+
+
+rep = []
+rep.append('camara')
+rep.append('legislativa')
+rep.append('distrito')
+rep.append('deputado')
+
 def createDocs(filenameDocs,filenameData,filenameMeta,limite):
     if os.path.exists(filenameDocs):
         os.remove(filenameDocs)
@@ -43,7 +70,7 @@ def createDocs(filenameDocs,filenameData,filenameMeta,limite):
         if i % (limite/10) == 0:
             print('Lendo documento #{}'.format(i))
         # Texto
-        html = row.iat[0, 5]
+        html = row.iat[0, 0]
         soup = BeautifulSoup(html, "html.parser")
         text_with_spaces = soup.get_text(separator=' ')
         text = text_with_spaces.lower()
@@ -51,29 +78,25 @@ def createDocs(filenameDocs,filenameData,filenameMeta,limite):
         out = unidecode(nopunct)
         text_tokens = word_tokenize(out)
         tokens_without_sw = [word for word in text_tokens if word.lower() not in stopwords.words('portuguese')]
-        final = ' '.join(tokens_without_sw)
+        tokens_without_rep = [word for word in tokens_without_sw if word.lower() not in rep]
+        final = ' '.join(tokens_without_rep)
         f.write(final + '\n')
 
         # Meta dados
         dMeta = {}
-        dMeta['c0'] = str(row.iat[0, 0])
-        dMeta['c1'] = str(row.iat[0, 1])
-        dMeta['c2'] = str(row.iat[0, 2])
-        dMeta['c3'] = str(row.iat[0, 3])
-        dMeta['c4'] = str(row.iat[0, 4])
-        dMeta['c6'] = str(row.iat[0, 6])
+        dMeta['classe'] = str(row.iat[0, 1])
         ddMeta[i] = dMeta
         if i > limite:
             break
     f.close()
-    print('Docs {} gerado!'.format(filenameDocs))
+    print('Docs "{}" gerado!'.format(filenameDocs))
 
     # Metadados
     if os.path.exists(filenameMeta):
         os.remove(filenameMeta)
     with open(filenameMeta, 'w') as outfile:
         json.dump(ddMeta, outfile)
-    print('Meta {} gerado!'.format(filenameMeta))
+    print('Meta "{}" gerado!'.format(filenameMeta))
 
 def loadMeta(filenameMeta):
     with open(filenameMeta) as json_file:
@@ -89,7 +112,8 @@ def createDictionary(filenameDocs,filenameDict):
     dictionary.filter_tokens(stop_ids + once_ids)
     dictionary.compactify()
     dictionary.save(filenameDict)
-    print('Dictionary {} gerado!'.format(filenameDict))
+    print('Dictionary "{}" gerado!'.format(filenameDict))
+    print(dictionary)
 
 def loadDictionary(filenameDict):
     dictionary = Dictionary.load(filenameDict)
@@ -125,8 +149,7 @@ def createJsonTopics(filenameLSI,num_topics,filenameJsonTopics):
         json.dump(topics, outfile)
     print('Tópicos {} gerado!'.format(filenameJsonTopics))
 
-
-def topicoDominante(filenameLSI,filenameCorpus,filenameMeta):
+def topicoDominante(filenameLSI,filenameCorpus,filenameMeta,filenameSelect):
     # Carrega
     lsi = LsiModel.load(filenameLSI)
     corpus = corpora.MmCorpus(filenameCorpus)
@@ -134,11 +157,27 @@ def topicoDominante(filenameLSI,filenameCorpus,filenameMeta):
         ddMeta = json.load(json_file)
 
     corpus_lsi = lsi[corpus]
+    listSelect = []
     for index, doc in enumerate(corpus_lsi):
-        dominant_topic = max(doc, key=lambda x: x[1])
-        ddMeta[str(index)]['dominante'] = str(dominant_topic[0])
-        ddMeta[str(index)]['dominante_peso'] = str(dominant_topic[1])
+        try:
+            dominant_topic = max(doc, key=lambda x: x[1])
+            ddMeta[str(index)]['dominante'] = str(dominant_topic[0])
+            numDominante = int(dominant_topic[0])
+            ddMeta[str(index)]['dominante_peso'] = str(dominant_topic[1])
+            ddMeta[str(index)]['dominante_classe'] = ddMeta[str(numDominante)]['classe']
+            if ddMeta[str(index)]['classe'] == ddMeta[str(numDominante)]['classe']:
+                dictSelect = {}
+                dictSelect['index'] = index
+                dictSelect['classe'] = ddMeta[str(index)]['classe']
+                listSelect.append(dictSelect)
+        except Exception as e:
+            print(f"Ocorreu um erro: {str(e)}")
     with open(filenameMeta, 'w') as outfile:
         json.dump(ddMeta, outfile)
-    print('Meta {} atualizado!'.format(filenameMeta))
+    print('Meta {} atualizado com as classes'.format(filenameMeta))
+
+    with open(filenameSelect, 'w') as outfile:
+        json.dump(listSelect, outfile)
+    print('Select {} criado!'.format(filenameMeta))
+
 
