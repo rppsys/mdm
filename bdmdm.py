@@ -1,4 +1,14 @@
-# Main.py - MDM
+import os, sys
+import django
+PROJECTPATH = '/home/ronie/prog/mdm'
+sys.path.insert(0, PROJECTPATH)
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'setup.settings')
+os.environ["DJANGO_ALLOW_ASYNC_UNSAFE"] = "true"  # https://docs.djangoproject.com/en/4.1/topics/async/#async-safety
+os.chdir(PROJECTPATH)
+django.setup()
+
+from appMDM.models import Doc
+
 import os
 import json
 from pprint import pprint  # pretty-printer
@@ -191,6 +201,12 @@ def createDocs(filenameDocs,filenameData,filenameMeta,filenameRep,limite,booSave
             saveDoc('tmp/{}C-final_{}.txt'.format(strPre,i),final)
 
         # Adiciona linha
+        objDoc = Doc()
+        objDoc.numDoc = i
+        objDoc.strClasse = str(row.iat[0, 1])
+        objDoc.txtDoc = final
+        objDoc.save()
+
         f.write(final + '\n')
 
         # Meta dados

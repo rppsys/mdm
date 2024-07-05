@@ -4,5 +4,5 @@
 *.mm
 *.model
 *.dict
-
+*.sqlite3
 

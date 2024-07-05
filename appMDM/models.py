@@ -5,5 +5,6 @@ from django.db import models
 class Doc(models.Model):
     def __str__(self):
         return f'{self.strClasse}'
-    txtDoc = models.TextField('document', blank=True)
+    numDoc = models.PositiveBigIntegerField('numero',unique=True)
+    txtDoc = models.TextField('documento', blank=True)
     strClasse = models.CharField('classe', max_length=100, blank=True)
